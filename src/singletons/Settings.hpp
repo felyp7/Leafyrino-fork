@@ -307,7 +307,20 @@ public:
 
     /// Behaviour
     BoolSetting allowDuplicateMessages = {"/behaviour/allowDuplicateMessages",
-                                          true};
+                                          true};       
+    // Rainbow messages                                   
+    BoolSetting rainbowMessages = {"/behaviour/rainbow/enabled", false};
+    BoolSetting rainbowMethod = {"/behaviour/rainbow/method", false};
+    BoolSetting rainbowMessagesPrime = {"/behaviour/rainbow/primeColors", true};
+    IntSetting rainbowSpeed = {"/behaviour/rainbow/speed", 10};
+    IntSetting rainbowStartingHue = {"/behaviour/rainbow/startingHue", 0};
+    IntSetting rainbowSaturation = {"/behaviour/rainbow/saturation", 153};
+    IntSetting rainbowLight = {"/behaviour/rainbow/light", 128};
+    BoolSetting allowRainbowChannels = {"/misc/allowRainbowChannels", false};
+    QStringSetting rainbowChannels = {"/misc/rainbowChannels", "forsen"};
+    BoolSetting enableDefaultColor = {"/misc/enableDefaultColor", false};
+    QStringSetting defaultColor = {"/misc/defaultColor", "#000000"};
+
     BoolSetting mentionUsersWithAt = {"/behaviour/mentionUsersWithAt", false};
     BoolSetting showJoins = {"/behaviour/showJoins", false};
     BoolSetting showParts = {"/behaviour/showParts", false};

@@ -214,6 +214,10 @@ private:
     std::queue<std::chrono::steady_clock::time_point> lastMessageMod_;
     std::chrono::steady_clock::time_point lastErrorTimeSpeed_;
     std::chrono::steady_clock::time_point lastErrorTimeAmount_;
+
+    // used for rainbow color usernames
+    std::map<QString, int> rainbowHue;
+    std::map<QString, int> nonPrimeColorsIndex;
 };
 
 }  // namespace chatterino
