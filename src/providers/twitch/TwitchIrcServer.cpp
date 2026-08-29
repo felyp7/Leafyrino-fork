@@ -1054,6 +1054,13 @@ bool TwitchIrcServer::prepareToSend(
     return true;
 }
 
+QStringList splitCommaSeparatedString(const QString &str)
+{
+    QStringList list = str.split(',');
+    list.removeAll(""); // Remove empty parts
+    return list;
+}
+
 void TwitchIrcServer::onMessageSendRequested(
     const std::shared_ptr<TwitchChannel> &channel, const QString &message,
     bool &sent)
