@@ -996,6 +996,8 @@ set(SOURCE_FILES
         widgets/settingspages/LeafyrinoPage.hpp
         widgets/settingspages/TechnorinoPage.cpp
         widgets/settingspages/TechnorinoPage.hpp
+        widgets/settingspages/ForserinoPage.cpp
+        widgets/settingspages/ForserinoPage.hpp
         widgets/settingspages/HighlightingPage.cpp
         widgets/settingspages/HighlightingPage.hpp
         widgets/settingspages/IgnoresPage.cpp
