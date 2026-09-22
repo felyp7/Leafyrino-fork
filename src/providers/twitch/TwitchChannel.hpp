@@ -377,10 +377,10 @@ public:
     void markConnected();
 
     // Emotes
-    std::optional<EmotePtr> twitchEmote(const EmoteName &name) const;
-    std::optional<EmotePtr> bttvEmote(const EmoteName &name) const;
-    std::optional<EmotePtr> ffzEmote(const EmoteName &name) const;
-    std::optional<EmotePtr> seventvEmote(const EmoteName &name) const;
+    std::optional<EmotePtr> twitchEmote(EmoteNameView name) const;
+    std::optional<EmotePtr> bttvEmote(EmoteNameView name) const;
+    std::optional<EmotePtr> ffzEmote(EmoteNameView name) const;
+    std::optional<EmotePtr> seventvEmote(EmoteNameView name) const;
 
     std::shared_ptr<const EmoteMap> localTwitchEmotes() const;
     std::shared_ptr<const EmoteMap> bttvEmotes() const;
@@ -658,11 +658,16 @@ private:
      * @param platform The platform the emote was updated on ("7TV", "BTTV", "FFZ")
      * @param actor The actor performing the update (possibly empty)
      * @param emote The emote that was added or removed
+     * @param now The time the update was received
      */
-    void addOrReplaceLiveUpdatesAddRemove(bool isEmoteAdd,
-                                          const QString &platform,
-                                          const QString &actor,
-                                          const LiveUpdateEmote &emote);
+    void addOrReplaceLiveUpdatesAddRemove(
+        bool isEmoteAdd, const QString &platform, const QString &actor,
+        const LiveUpdateEmote &emote,
+        const QDateTime &now = QDateTime::currentDateTime());
+    void addOrReplaceLiveUpdatesAddRemove(
+        bool isEmoteAdd, const QString &platform, const QString &actor,
+        const QString &emoteName,
+        const QDateTime &now = QDateTime::currentDateTime());
 
     /**
      * Tries to replace the last emote update message.
@@ -677,12 +682,14 @@ private:
      * @param platform The emote platform  ("7TV", "BTTV", "FFZ")
      * @param actor The actor performing the action (possibly empty)
      * @param emote The updated emote
+     * @param now The time the update was received
      * @return true, if the last message was replaced
      */
     bool tryReplaceLastLiveUpdateAddOrRemove(MessageFlag op,
                                              const QString &platform,
                                              const QString &actor,
-                                             const LiveUpdateEmote &emote);
+                                             const LiveUpdateEmote &emote,
+                                             const QDateTime &now);
 
     // Data
     const QString subscriptionUrl_;
@@ -858,6 +865,8 @@ private:
     friend class IrcMessageHandler;
     friend class Commands_E2E_Test;
     friend class TwitchChannelTestAccess;
+    friend class TwitchChannel_LiveUpdateGrouping_Test;
+    friend class NotificationController_StatusMessagesRespectUsernameStyle_Test;
     friend class ::TestIrcMessageHandlerP;
     friend class ::TestEventSubMessagesP;
 

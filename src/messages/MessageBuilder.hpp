@@ -4,12 +4,15 @@
 #include "common/Outcome.hpp"
 #include "messages/ast/Parser.hpp"
 #include "messages/MessageColor.hpp"
+#include "messages/MessageElement.hpp"
 #include "messages/MessageFlag.hpp"
+#include "messages/MessageParseArgs.hpp"
 #include "singletons/Fonts.hpp"
 
 #include <IrcMessage>
 #include <IrcTagsRef>
 #include <QColor>
+#include <QDateTime>
 #include <QRegularExpression>
 #include <QString>
 #include <QTime>
@@ -39,10 +42,13 @@ class TwitchBadge;
 class ChannelChatters;
 class MessageThread;
 class IgnorePhrase;
+struct HelixMinimalUser;
 struct HelixVip;
 using HelixModerator = HelixVip;
 struct ChannelPointReward;
 struct TwitchEmoteOccurrence;
+struct TwitchSpecialOccurrence;
+struct HelixPinnedChatMessage;
 
 namespace linkparser {
 struct Parsed;
@@ -74,17 +80,6 @@ const ImageUploaderResultTag imageUploaderResultMessage{};
 
 MessagePtr makeSystemMessage(const QString &text);
 MessagePtr makeSystemMessage(const QString &text, const QTime &time);
-
-struct MessageParseArgs {
-    bool disablePingSounds = false;
-    bool isReceivedWhisper = false;
-    bool isSentWhisper = false;
-    bool trimSubscriberUsername = false;
-    bool isSubscriptionMessage = false;
-    bool allowIgnore = true;
-    bool isAction = false;
-    QString channelPointRewardId = "";
-};
 
 struct HighlightAlert {
     QUrl customSound;
@@ -128,10 +123,12 @@ public:
 
     MessageBuilder(LiveUpdatesAddEmoteMessageTag, const QString &platform,
                    const QString &actor,
-                   const std::vector<LiveUpdateEmote> &emotes);
+                   const std::vector<LiveUpdateEmote> &emotes,
+                   const QDateTime &time = QDateTime::currentDateTime());
     MessageBuilder(LiveUpdatesRemoveEmoteMessageTag, const QString &platform,
                    const QString &actor,
-                   const std::vector<LiveUpdateEmote> &emotes);
+                   const std::vector<LiveUpdateEmote> &emotes,
+                   const QDateTime &time = QDateTime::currentDateTime());
     MessageBuilder(LiveUpdatesUpdateEmoteMessageTag, const QString &platform,
                    const QString &actor, const QString &emoteName,
                    const QString &oldEmoteName, const EmotePtr &emote);
@@ -170,8 +167,10 @@ public:
         return pointer;
     }
 
-    void appendOrEmplaceText(const QString &text, MessageColor color,
-                             FontStyle style = FontStyle::ChatMedium);
+    MessageElement *appendOrEmplaceText(
+        const QString &text, MessageColor color,
+        MessageElementFlags messageFlags = MessageElementFlag::Text,
+        FontStyle style = FontStyle::ChatMedium);
     void appendOrEmplaceSystemTextAndUpdate(const QString &text,
                                             QString &toUpdate);
 
@@ -198,13 +197,13 @@ public:
     static MessagePtr makeChannelPointRewardMessage(
         const ChannelPointReward &reward, bool isMod, bool isBroadcaster);
 
-    static MessagePtr makeLiveMessage(const QString &channelName,
-                                      const QString &channelID,
+    /// Make a "CHANNEL_NAME has gone live!" message
+    static MessagePtr makeLiveMessage(const HelixMinimalUser &channel,
                                       const QString &title,
                                       MessageFlags extraFlags = {});
 
-    static MessagePtr makeOfflineSystemMessage(const QString &channelName,
-                                               const QString &channelID);
+    // Messages in normal chat for channel stuff
+    static MessagePtr makeOfflineSystemMessage(const HelixMinimalUser &channel);
     static MessagePtr makeHostingSystemMessage(const QString &channelName,
                                                bool hostOn);
     static MessagePtr makeDeletionMessageFromIRC(
@@ -259,7 +258,8 @@ public:
     static MessagePtrMut makeSystemMessageWithUser(
         const QString &text, const QString &loginName,
         const QString &displayName, const MessageColor &userColor,
-        const QTime &time, const Communi::IrcMessage &ircMessage);
+        const QTime &time, const Communi::IrcMessage &ircMessage,
+        TwitchChannel *channel);
 
     static MessagePtrMut makeSubgiftMessage(Communi::TagsRef tags,
                                             const QTime &time,
@@ -289,9 +289,11 @@ private:
     void addTextOrEmote(TextState &state, QString string,
                         FontStyle style = FontStyle::ChatMedium);
 
+    void addTwitchGif(const QString &id, QStringView originalText);
+
     Outcome tryAppendCheermote(TextState &state, const QString &string);
     Outcome tryAppendEmote(TwitchChannel *twitchChannel, const QString &userID,
-                           const EmoteName &name);
+                           EmoteNameView name);
 
     bool isEmpty() const;
     MessageElement &back();
@@ -303,8 +305,14 @@ private:
                        TwitchChannel *twitchChannel,
                        bool trimSubscriberUsername);
     void parseMessageID(Communi::TagsRef tags);
-    /// Parses most of them message flags based on the given tags
-    void parseMessageTags(Communi::TagsRef tags);
+    void appendOrEmplaceTextWithUser(
+        TwitchChannel *channel, const QString &userID,
+        const QString &userLoginName, const QString &userDisplayName,
+        const QString &userColorString, const QString &messageText,
+        MessageElementFlags mentionFlags, MessageElementFlags textFlags);
+    /// Parses most of the message flags based on the given tags
+    void parseMessageTags(Communi::TagsRef tags, TwitchChannel *channel,
+                          bool hasContent);
 
     /// Parses the room-ID this message was received in
     ///
@@ -338,11 +346,14 @@ private:
 
     void addWordsFromAstNodes(
         const QVector<ast::ASTNode> &nodes,
-        const std::vector<TwitchEmoteOccurrence> &twitchEmotes,
+        const std::vector<TwitchSpecialOccurrence> &twitchSpecials,
         TextState &state, FontStyle style = FontStyle::ChatMedium);
     void addWords(const QStringList &words,
-                  const std::vector<TwitchEmoteOccurrence> &twitchEmotes,
+                  const std::vector<TwitchSpecialOccurrence> &twitchSpecials,
                   TextState &state, FontStyle style = FontStyle::ChatMedium);
+    void addWords(QStringView text,
+                  const std::vector<TwitchSpecialOccurrence> &twitchSpecials,
+                  TextState &state);
 
     void appendTwitchBadges(Communi::TagsRef tags,
                             TwitchChannel *twitchChannel);

@@ -7,6 +7,7 @@
 #include "util/QStringHash.hpp"
 
 #include <QColor>
+#include <QDateTime>
 #include <QTime>
 
 #include <cinttypes>
@@ -113,11 +114,7 @@ struct Message {
 
     HelixAnnouncementColor announcementColor{HelixAnnouncementColor::Primary};
 
-    /**
-     * Clones this message.
-     *
-     * @return An identical message, independent from this one.
-     */
+    /// Returns an identical, non-frozen message, independent from this one.
     std::shared_ptr<Message> clone() const;
 
     QJsonObject toJson() const;
