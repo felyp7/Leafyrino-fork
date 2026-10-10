@@ -346,6 +346,8 @@ public:
         "/appearance/messages/showTwitchGifs",
         true,
     };
+    /// Giphy IDs saved in the GIF picker, newest first, as a JSON array.
+    QStringSetting favoriteTwitchGifs{"/twitch/gifs/favorites", "[]"};
     BoolSetting separateMessages = {"/appearance/messages/separateMessages",
                                     false};
     BoolSetting fadeMessageHistory = {"/appearance/messages/fadeMessageHistory",
@@ -490,6 +492,7 @@ public:
     BoolSetting showBadgesFfzAp = {"/appearance/badges/ffzap", true};
     BoolSetting showBadgesDankChat = {"/appearance/badges/dankchat", true};
     BoolSetting showBadgesChatsen = {"/appearance/badges/chatsen", true};
+    BoolSetting showBadgesBluzyrino = {"/appearance/badges/bluzyrino", true};
     BoolSetting showSelectBadgeButton = {"/client/showSelectBadgeButton", true};
     BoolSetting animateSevenTVBadges = {"/appearance/badges/animateSeventv",
                                         true};
@@ -592,6 +595,11 @@ public:
         50,
     };
 
+    BoolSetting showChatterListInAllTwitchChannels = {
+        "/behaviour/chatterList/showInAllTwitchChannels", true};
+    QStringSetting chatterListDataMode = {"/behaviour/chatterList/dataMode",
+                                          "best"};
+
     // Auto-completion
     BoolSetting onlyFetchChattersForSmallerStreamers = {
         "/behaviour/autocompletion/onlyFetchChattersForSmallerStreamers", true};
@@ -651,6 +659,9 @@ public:
     BoolSetting enableEmoteImages = {"/emotes/enableEmoteImages", true};
     BoolSetting animateEmotes = {"/emotes/enableGifAnimations", true};
     BoolSetting enableZeroWidthEmotes = {"/emotes/enableZeroWidthEmotes", true};
+    BoolSetting enableEmoteModifiers = {"/emotes/enableModifiers", true};
+    ChatterinoSetting<QStringList> disabledEmoteModifiers = {
+        "/emotes/disabledModifiers", {}};
     FloatSetting emoteScale = {"/emotes/scale", 1.f};
     EnumStringSetting<EmoteTooltipScale> emoteTooltipScale = {
         "/emotes/tooltipScale",
@@ -988,6 +999,7 @@ public:
     QStringSetting webchatColor = {"/misc/webchatColor", "#3FFFA30B"};
     QStringSetting androidColor = {"/misc/androidColor", "#3F25D300"};
     QStringSetting iosColor = {"/misc/iosColor", "#3FFF69B4"};
+    BoolSetting clientDetectionIcon = {"/misc/clientDetectionIcon", false};
     BoolSetting fakeWebChat = {"/misc/fakeWebChat", false};
 #ifdef Q_OS_LINUX
     BoolSetting useKeyring = {"/misc/useKeyring", true};
@@ -1073,6 +1085,8 @@ public:
                                           true};
     BoolSetting showUsercardRoleManagementMenu = {
         "/usercard/showRoleManagementMenu", false};
+    BoolSetting showCrossActionsInUnmoderatedChannels = {
+        "/usercard/showCrossActionsInUnmoderatedChannels", false};
     BoolSetting hideModActionsOnModUsercards = {
         "/misc/hideModActionsOnModUsercards", true};
     BoolSetting showModActionsOnModUsercardsAsLeadMod = {
@@ -1254,6 +1268,8 @@ public:
         "/moltorino/channelPoints/closeAfterRedeem", true};
     BoolSetting rewardsReturnToListAfterRedeem{
         "/moltorino/channelPoints/returnToListAfterRedeem", false};
+    BoolSetting enableGigantifyEmotes{
+        "/moltorino/channelPoints/enableGigantifyEmotes", true};
 
     /// Banner content text scales. These intentionally do not scale banner
     /// chrome, icons, timers, or progress bars.
@@ -1312,6 +1328,10 @@ public:
     BoolSetting nukeSkipVips{"/moltorino/moderation/nuke/skipVips", false};
     QStringSetting nukeModerationMessage{
         "/moltorino/moderation/nuke/moderationMessage", ""};
+    BoolSetting showEditStreamInfoButtonInSplitHeader{
+        "/moltorino/showEditStreamInfoButtonInSplitHeader", true};
+    IntSetting defaultCommercialDuration{
+        "/moltorino/moderation/defaultCommercialDuration", 30};
     BoolSetting showRaidStatusAboveInput{
         "/moltorino/moderation/raid/showStatusAboveInput", true};
 
@@ -1340,6 +1360,13 @@ public:
     /// Others
     BoolSetting showCommandSuggestions{"/moltorino/showCommandSuggestions",
                                        true};
+    BoolSetting includePotatCommands{"/moltorino/includePotatCommands", true};
+    BoolSetting showPotatCommandAliases{"/moltorino/showPotatCommandAliases",
+                                        true};
+    BoolSetting includeSupibotCommands{"/leafyrino/includeSupibotCommands",
+                                       true};
+    BoolSetting showSupibotCommandAliases{
+        "/leafyrino/showSupibotCommandAliases", true};
     BoolSetting hideUnavailableModCommands{
         "/moltorino/hideUnavailableModCommands", true};
     BoolSetting showFollowButtonInSplitHeader{
@@ -1415,6 +1442,7 @@ public:
     SignalVector<ModerationAction> moderationActions;
     SignalVector<ChannelLog> loggedChannels;
 
+    bool isEmoteModifierEnabled(const QString &name) const;
     bool isHighlightedUser(const QString &username);
     bool isBlacklistedUser(const QString &username);
     bool isMutedChannel(const QString &channelName);

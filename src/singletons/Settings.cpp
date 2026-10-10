@@ -113,6 +113,12 @@ void _actuallyRegisterSetting(
     _settings.push_back(std::move(setting));
 }
 
+bool Settings::isEmoteModifierEnabled(const QString &name) const
+{
+    return this->enableEmoteModifiers.getValue() &&
+           !this->disabledEmoteModifiers.getValue().contains(name);
+}
+
 bool Settings::isHighlightedUser(const QString &username)
 {
     auto items = this->highlightedUsers.readOnly();
@@ -455,6 +461,10 @@ Settings::Settings(const Modes &modes, const Args &args,
                         return makeUnexpected("Failed to seek in file");
                     case LoadError::JSONParseError:
                         return makeUnexpected("File contained malformed JSON");
+                    case LoadError::SavingFromTemporaryFileFailed:
+                        return makeUnexpected(
+                            u"Failed to save '" % settingsPath %
+                            u"' with settings from .tmp file");
                 }
                 assert(false);
                 return makeUnexpected("Unknown error");

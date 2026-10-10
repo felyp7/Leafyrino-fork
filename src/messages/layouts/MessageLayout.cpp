@@ -12,6 +12,7 @@
 #include "messages/MessageElement.hpp"
 #include "messages/Selection.hpp"
 #include "providers/colors/ColorProvider.hpp"
+#include "singletons/Resources.hpp"
 #include "singletons/Settings.hpp"
 #include "singletons/StreamerMode.hpp"
 #include "singletons/WindowManager.hpp"
@@ -28,6 +29,8 @@
 namespace chatterino {
 
 namespace {
+
+constexpr int SCROLLBAR_PADDING = 20;
 
 std::optional<QColor> clientDetectionHighlightColor(
     Message::ClientDetectionStatus status,
@@ -205,6 +208,8 @@ void MessageLayout::actuallyLayout(const MessageLayoutContext &ctx)
         ShowModerationState::Never;
     bool hideSimilar = getSettings()->hideSimilar;
     bool hideReplies = !ctx.flags.has(MessageElementFlag::RepliedMessage);
+    const bool hideGigantifyReward =
+        this->message_->usesTwitchGigantifyPresentation();
 
     this->container_.beginLayout(ctx.width, this->scale_, this->imageScale_,
                                  this->emoteScale_, this->badgeScale_,
@@ -251,6 +256,12 @@ void MessageLayout::actuallyLayout(const MessageLayoutContext &ctx)
             continue;
         }
 
+        if (hideGigantifyReward &&
+            element->getFlags().has(MessageElementFlag::ChannelPointReward))
+        {
+            continue;
+        }
+
         element->addToContainer(this->container_, ctx);
     }
 
@@ -287,7 +298,7 @@ MessagePaintResult MessageLayout::paint(const MessagePaintContext &ctx)
 
     ctx.painter.drawPixmap(QPoint{0, ctx.y}, *pixmap);
 
-    result.hasAnimatedElements = this->container_.paintAnimatedElements(
+    result.animatedRegion = this->container_.paintAnimatedElements(
         ctx.painter, ctx.y, ctx.isCollapsed);
 
     if (this->message_->flags.has(MessageFlag::Disabled))
@@ -316,7 +327,8 @@ MessagePaintResult MessageLayout::paint(const MessagePaintContext &ctx)
     }
 
     if (!ctx.isMentions &&
-        (this->message_->flags.has(MessageFlag::RedeemedChannelPointReward) ||
+        ((this->message_->flags.has(MessageFlag::RedeemedChannelPointReward) &&
+          !this->message_->usesTwitchGigantifyPresentation()) ||
          this->message_->flags.has(MessageFlag::RedeemedHighlight)) &&
         ctx.preferences.enableRedeemedHighlight)
     {
@@ -469,8 +481,9 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
             backgroundColor, *ctx.colorProvider.color(ColorType::Follow));
     }
     else if ((this->message_->flags.has(MessageFlag::RedeemedHighlight) ||
-              this->message_->flags.has(
-                  MessageFlag::RedeemedChannelPointReward)) &&
+              (this->message_->flags.has(
+                   MessageFlag::RedeemedChannelPointReward) &&
+               !this->message_->usesTwitchGigantifyPresentation())) &&
              ctx.preferences.enableRedeemedHighlight)
     {
         backgroundColor =
@@ -523,7 +536,47 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
                                       platformTint(this->message_->platform));
     }
 
+    std::optional<QPixmap> clientDetectionIcon = {};
+
+    if (getSettings()->clientDetectionIcon)
+    {
+        auto resources = getResources();
+
+        switch (this->message_->clientDetection)
+        {
+            using enum Message::ClientDetectionStatus;
+            case Webchat: {
+                clientDetectionIcon = resources.chat.twitch;
+                break;
+            }
+            case Android: {
+                clientDetectionIcon = resources.chat.android;
+                break;
+            }
+            case IOS: {
+                clientDetectionIcon = resources.chat.ios;
+                break;
+            }
+
+            case Unknown:
+            case Abnormal:
+                break;
+        }
+    }
+
     painter.fillRect(buffer->rect(), backgroundColor);
+
+    if (getSettings()->clientDetectionIcon && clientDetectionIcon.has_value())
+    {
+        float size = 16 * this->scale_;
+        float right =
+            float(buffer->rect().right()) - (SCROLLBAR_PADDING * this->scale_);
+        int left = int(right - size);
+        int top = int((float(buffer->height()) - size * this->scale_) / 2);
+
+        painter.drawPixmap(QRect(left, top, int(size), int(size)),
+                           clientDetectionIcon.value());
+    }
 
     this->container_.paintElements(painter, ctx);
 

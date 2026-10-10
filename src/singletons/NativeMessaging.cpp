@@ -24,6 +24,7 @@
 #include <QJsonValue>
 #include <QSettings>
 #include <QStringBuilder>
+#include <QTimer>
 
 #include <iostream>
 #include <tuple>
@@ -264,6 +265,12 @@ NativeMessagingServer::NativeMessagingServer()
 
 NativeMessagingServer::~NativeMessagingServer()
 {
+    if (this->detachTimer_)
+    {
+        this->detachTimer_->stop();
+        this->detachTimer_.reset();
+    }
+
     if (!ipc::IpcQueue::remove("chatterino_gui"))
     {
         qCWarning(chatterinoNativeMessage) << "Failed to remove message queue";
@@ -283,9 +290,48 @@ NativeMessagingServer::~NativeMessagingServer()
     }
 }
 
+void NativeMessagingServer::noteActivity()
+{
+    const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         std::chrono::steady_clock::now().time_since_epoch())
+                         .count();
+    this->lastActivityMs_.store(now, std::memory_order_relaxed);
+}
+
 void NativeMessagingServer::start()
 {
+    this->noteActivity();
     this->thread->start();
+
+    this->detachTimer_ = std::make_unique<QTimer>();
+    this->detachTimer_->setInterval(5 * 1000);
+    QObject::connect(this->detachTimer_.get(), &QTimer::timeout, [this] {
+        if (!getSettings()->autoDetachLiveTab)
+        {
+            return;
+        }
+
+        const auto now =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count();
+        const auto last = this->lastActivityMs_.load(std::memory_order_relaxed);
+        if (now - last < 10 * 1000)
+        {
+            return;
+        }
+
+        auto watching = getApp()->getTwitch()->getWatchingChannel().get();
+        if (!watching || watching->isEmpty())
+        {
+            return;
+        }
+
+        // Avoid clearing again on every tick until the browser speaks.
+        this->noteActivity();
+        getApp()->getTwitch()->setWatchingChannel(Channel::getEmpty());
+    });
+    this->detachTimer_->start();
 }
 
 NativeMessagingServer::ReceiverThread::ReceiverThread(
@@ -325,6 +371,15 @@ void NativeMessagingServer::ReceiverThread::handleMessage(
     const QJsonObject &root)
 {
     QString action = root["action"_L1].toString();
+
+    // Any of these reset the auto-detach timer. detach is the browser
+    // leaving the channel, so the ~10s timeout starts from that message
+    // instead of clearing /watching immediately.
+    if (action == "select" || action == "sync" || action == "ping" ||
+        action == "detach")
+    {
+        this->parent_.noteActivity();
+    }
 
     if (action == "select")
     {
