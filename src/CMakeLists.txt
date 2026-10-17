@@ -87,6 +87,8 @@ set(SOURCE_FILES
         controllers/commands/builtin/kick/KickRawEvent.hpp
         controllers/commands/builtin/kick/ModerationActions.cpp
         controllers/commands/builtin/kick/ModerationActions.hpp
+        controllers/commands/builtin/seventv/Presence.cpp
+        controllers/commands/builtin/seventv/Presence.hpp
         controllers/commands/builtin/twitch/AddModerator.cpp
         controllers/commands/builtin/twitch/AddModerator.hpp
         controllers/commands/builtin/twitch/AddVIP.cpp
@@ -449,6 +451,15 @@ set(SOURCE_FILES
         providers/bluzyrino/BluzyrinoBadges.cpp
         providers/bluzyrino/BluzyrinoBadges.hpp
 
+        providers/jilchat/JilChatBadges.cpp
+        providers/jilchat/JilChatBadges.hpp
+
+        providers/limerino/LimerinoBadges.cpp
+        providers/limerino/LimerinoBadges.hpp
+
+        providers/badgehq/BadgeHQBadges.cpp
+        providers/badgehq/BadgeHQBadges.hpp
+
         providers/colors/ColorProvider.cpp
         providers/colors/ColorProvider.hpp
 
@@ -547,6 +558,9 @@ set(SOURCE_FILES
         providers/recentmessages/Impl.cpp
         providers/recentmessages/Impl.hpp
 
+        providers/translation/TranslationCredentials.cpp
+        providers/translation/TranslationRequest.cpp
+        providers/translation/TranslationRequest.hpp
         providers/translation/Translator.cpp
         providers/translation/Translator.hpp
 
@@ -924,6 +938,8 @@ set(SOURCE_FILES
         widgets/dialogs/SelectChannelFiltersDialog.hpp
         widgets/dialogs/SettingsDialog.cpp
         widgets/dialogs/SettingsDialog.hpp
+        widgets/dialogs/TranslationProviderDialog.cpp
+        widgets/dialogs/TranslationProviderDialog.hpp
         widgets/dialogs/UpdateDialog.cpp
         widgets/dialogs/UpdateDialog.hpp
         widgets/dialogs/UserInfoPopup.cpp

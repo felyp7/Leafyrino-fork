@@ -346,6 +346,9 @@ public:
         "/appearance/messages/showTwitchGifs",
         true,
     };
+    /// Multiplier for large Twitch GIFs. 0.75 is the default size.
+    FloatSetting twitchGifScale = {"/appearance/messages/twitchGifScale",
+                                   0.75F};
     /// Giphy IDs saved in the GIF picker, newest first, as a JSON array.
     QStringSetting favoriteTwitchGifs{"/twitch/gifs/favorites", "[]"};
     BoolSetting separateMessages = {"/appearance/messages/separateMessages",
@@ -493,6 +496,9 @@ public:
     BoolSetting showBadgesDankChat = {"/appearance/badges/dankchat", true};
     BoolSetting showBadgesChatsen = {"/appearance/badges/chatsen", true};
     BoolSetting showBadgesBluzyrino = {"/appearance/badges/bluzyrino", true};
+    BoolSetting showBadgesJilChat = {"/appearance/badges/jilchat", true};
+    BoolSetting showBadgesBadgeHQ = {"/appearance/badges/badgehq", true};
+    BoolSetting showBadgesLimerino = {"/appearance/badges/limerino", true};
     BoolSetting showSelectBadgeButton = {"/client/showSelectBadgeButton", true};
     BoolSetting animateSevenTVBadges = {"/appearance/badges/animateSeventv",
                                         true};
@@ -999,6 +1005,7 @@ public:
     QStringSetting webchatColor = {"/misc/webchatColor", "#3FFFA30B"};
     QStringSetting androidColor = {"/misc/androidColor", "#3F25D300"};
     QStringSetting iosColor = {"/misc/iosColor", "#3FFF69B4"};
+    QStringSetting mobileNewColor = {"/misc/mobileNewColor", "#3F25D300"};
     BoolSetting clientDetectionIcon = {"/misc/clientDetectionIcon", false};
     BoolSetting fakeWebChat = {"/misc/fakeWebChat", false};
 #ifdef Q_OS_LINUX
@@ -1340,6 +1347,15 @@ public:
         "/moltorino/client/showTranslateMessageContextAction", true};
     QStringSetting messageTranslationTargetLanguage{
         "/moltorino/client/messageTranslationTargetLanguage", "en"};
+    QStringSetting translationProvider{"/moltorino/client/translationProvider",
+                                       "google"};
+    QStringSetting translationLibreEndpoint{
+        "/moltorino/client/translationLibreEndpoint",
+        "https://libretranslate.com"};
+    QStringSetting translationAzureRegion{
+        "/moltorino/client/translationAzureRegion", ""};
+    QStringSetting translationAzureEndpoint{
+        "/moltorino/client/translationAzureEndpoint", ""};
     BoolSetting showTranslatedMessageIndicator{
         "/moltorino/client/showTranslatedMessageIndicator", true};
     BoolSetting showOutgoingTranslationButton{
@@ -1363,6 +1379,8 @@ public:
     BoolSetting includePotatCommands{"/moltorino/includePotatCommands", true};
     BoolSetting showPotatCommandAliases{"/moltorino/showPotatCommandAliases",
                                         true};
+    BoolSetting showPotatUnprefixedCommands{
+        "/leafyrino/showPotatUnprefixedCommands", false};
     BoolSetting includeSupibotCommands{"/leafyrino/includeSupibotCommands",
                                        true};
     BoolSetting showSupibotCommandAliases{

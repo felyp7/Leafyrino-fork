@@ -10,6 +10,7 @@
 #include "util/FuzzyConvert.hpp"
 #include "widgets/buttons/SignalLabel.hpp"
 #include "widgets/dialogs/MoltorinoAuthDialog.hpp"
+#include "widgets/dialogs/TranslationProviderDialog.hpp"
 #include "widgets/settingspages/GeneralPageView.hpp"
 #include "widgets/settingspages/SettingWidget.hpp"
 #ifndef Q_OS_MACOS
@@ -113,6 +114,16 @@ std::vector<std::pair<QString, QVariant>> outgoingTranslationModeItems()
         {QStringLiteral("Preview only"), QStringLiteral("preview")},
         {QStringLiteral("Translate on send"), QStringLiteral("send")},
     };
+}
+
+std::vector<std::pair<QString, QVariant>> translationProviderItems()
+{
+    std::vector<std::pair<QString, QVariant>> items;
+    for (const auto &provider : chatterino::translationProviders())
+    {
+        items.emplace_back(provider.name, provider.id);
+    }
+    return items;
 }
 
 QString formatTimestampStatus(const QString &isoTimestamp)
@@ -698,26 +709,25 @@ MoltorinoPage::MoltorinoPage()
             "chat. The /gigantify command still works when this is off.")
         ->addTo(*view);
 
+    view->addDropdown<float>(
+            "Twitch GIF size", {"0.5x", "Default", "1x", "1.25x", "1.5x", "2x"},
+            s.twitchGifScale,
+            [](auto val) {
+                if (val == 0.75F)
+                {
+                    return QString("Default");
+                }
+                return QString::number(val) + "x";
+            },
+            [](auto args) {
+                return std::clamp(fuzzyToFloat(args.value, 0.75F), 0.5F, 2.0F);
+            },
+            true, "Scale Twitch GIFs from 0.5x to 2x.")
+        ->setToolTip("Scale Twitch GIFs from 0.5x to 2x.");
+
     view->addTitle("Input Box");
     view->addDescription(
         "Chat input buttons, typing helpers, and quick controls.");
-
-    SettingWidget::checkbox("Show command suggestions while typing",
-                            s.showCommandSuggestions)
-        ->setTooltip("Show a compact command suggestion strip above the "
-                     "message input.")
-        ->addTo(*view);
-
-    SettingWidget::checkbox("Include Potat commands in suggestions",
-                            s.includePotatCommands)
-        ->setTooltip("Suggest Potat # commands after you type #.")
-        ->addTo(*view);
-
-    SettingWidget::checkbox("Show Potat command aliases",
-                            s.showPotatCommandAliases)
-        ->setTooltip("Include shortcuts such as #ga in Potat suggestions.")
-        ->conditionallyEnabledBy(s.includePotatCommands)
-        ->addTo(*view);
 
     SettingWidget::checkbox("Hide unavailable mod commands",
                             s.hideUnavailableModCommands)
@@ -733,6 +743,30 @@ MoltorinoPage::MoltorinoPage()
     SettingWidget::checkbox("Show poll button", s.showPollButton)
         ->setTooltip("Show the poll button next to the message input.")
         ->addTo(*view);
+
+    SettingWidget::checkbox("Hide emoji button", s.hideEmojiButton)
+        ->setTooltip("Hide the emoji/emote picker button next to the message "
+                     "input.")
+        ->addTo(*view);
+
+    SettingWidget::checkbox("Show raid countdown above chat input",
+                            s.showRaidStatusAboveInput)
+        ->setTooltip("Show the raid target, viewer count, and countdown above "
+                     "the message input.")
+        ->addTo(*view);
+
+    view->addTitle("Translation");
+
+    SettingWidget::dropdown("Translation service", s.translationProvider,
+                            translationProviderItems())
+        ->setTooltip("Service used for incoming and outgoing translations.")
+        ->addTo(*view);
+
+    view->addButton("Set up translation", [this] {
+        auto *dialog = new TranslationProviderDialog(this);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->show();
+    });
 
     SettingWidget::checkbox("Show translation button",
                             s.showOutgoingTranslationButton)
@@ -777,15 +811,20 @@ MoltorinoPage::MoltorinoPage()
                      "setting.")
         ->addTo(*view);
 
-    SettingWidget::checkbox("Hide emoji button", s.hideEmojiButton)
-        ->setTooltip("Hide the emoji/emote picker button next to the message "
-                     "input.")
+    SettingWidget::checkbox("Show Translate message in right-click menu",
+                            s.showTranslateMessageContextAction)
+        ->setTooltip("Add a right-click action for translating chat messages.")
         ->addTo(*view);
 
-    SettingWidget::checkbox("Show raid countdown above chat input",
-                            s.showRaidStatusAboveInput)
-        ->setTooltip("Show the raid target, viewer count, and countdown above "
-                     "the message input.")
+    SettingWidget::dropdown("Translate messages to",
+                            s.messageTranslationTargetLanguage,
+                            translationLanguageItems())
+        ->setTooltip("Target language for translated chat messages.")
+        ->addTo(*view);
+
+    SettingWidget::checkbox("Show translated indicator",
+                            s.showTranslatedMessageIndicator)
+        ->setTooltip("Show muted (translated) text after translated messages.")
         ->addTo(*view);
 
     view->addTitle("Moderation");
@@ -995,22 +1034,6 @@ MoltorinoPage::MoltorinoPage()
     view->addTitle("Client");
     view->addDescription(
         "Twitch chat behavior, compatibility, and client experience options.");
-
-    SettingWidget::checkbox("Show Translate message in right-click menu",
-                            s.showTranslateMessageContextAction)
-        ->setTooltip("Add a right-click action for translating chat messages.")
-        ->addTo(*view);
-
-    SettingWidget::dropdown("Translate messages to",
-                            s.messageTranslationTargetLanguage,
-                            translationLanguageItems())
-        ->setTooltip("Target language for translated chat messages.")
-        ->addTo(*view);
-
-    SettingWidget::checkbox("Show translated indicator",
-                            s.showTranslatedMessageIndicator)
-        ->setTooltip("Show muted (translated) text after translated messages.")
-        ->addTo(*view);
 
     view->addTitle("Usercards");
 

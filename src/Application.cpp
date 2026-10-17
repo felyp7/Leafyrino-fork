@@ -37,6 +37,7 @@
 #include "debug/AssertInGuiThread.hpp"
 #include "messages/Message.hpp"
 #include "messages/MessageBuilder.hpp"
+#include "providers/badgehq/BadgeHQBadges.hpp"
 #include "providers/bluzyrino/BluzyrinoBadges.hpp"
 #include "providers/bttv/BttvLiveUpdates.hpp"
 #include "providers/chatsen/ChatsenBadges.hpp"
@@ -46,6 +47,8 @@
 #include "providers/ffzap/FfzApBadges.hpp"
 #include "providers/folhinha/FolhinhaBadges.hpp"
 #include "providers/homies/HomiesBadges.hpp"
+#include "providers/jilchat/JilChatBadges.hpp"
+#include "providers/limerino/LimerinoBadges.hpp"
 #include "providers/moltorino/MoltorinoAuth.hpp"
 #include "providers/potat/PotatCommands.hpp"
 #include "providers/repetitions/RepeatedMessageDetector.hpp"
@@ -213,6 +216,9 @@ Application::Application(Settings &_settings, const Paths &paths,
     , dankChatBadges(new DankChatBadges)
     , chatsenBadges(new ChatsenBadges)
     , bluzyrinoBadges(new BluzyrinoBadges)
+    , jilChatBadges(new JilChatBadges)
+    , limerinoBadges(new LimerinoBadges)
+    , badgeHQBadges(new BadgeHQBadges)
     , moltorinoSupporterBadges(new MoltorinoSupporterBadges)
     , repeatedMessageDetector(new RepeatedMessageDetector)
     , seventvPaints(new SeventvPaints)
@@ -283,6 +289,9 @@ void Application::initialize(Settings &settings, const Paths &paths)
     this->ffzBadges->load();
     this->bttvBadges->load();
     this->bluzyrinoBadges->initialize();
+    this->jilChatBadges->initialize();
+    this->limerinoBadges->initialize();
+    this->badgeHQBadges->initialize();
     this->moltorinoSupporterBadges->initialize();
 
     this->bttvEmotes->loadEmotes();
@@ -578,6 +587,24 @@ BluzyrinoBadges *Application::getBluzyrinoBadges()
     return this->bluzyrinoBadges.get();
 }
 
+JilChatBadges *Application::getJilChatBadges()
+{
+    assert(this->jilChatBadges);
+    return this->jilChatBadges.get();
+}
+
+LimerinoBadges *Application::getLimerinoBadges()
+{
+    assert(this->limerinoBadges);
+    return this->limerinoBadges.get();
+}
+
+BadgeHQBadges *Application::getBadgeHQBadges()
+{
+    assert(this->badgeHQBadges);
+    return this->badgeHQBadges.get();
+}
+
 MoltorinoSupporterBadges *Application::getMoltorinoSupporterBadges()
 {
     assert(this->moltorinoSupporterBadges);
@@ -849,6 +876,9 @@ void Application::stop()
     this->dankChatBadges.reset();
     this->chatsenBadges.reset();
     this->bluzyrinoBadges.reset();
+    this->jilChatBadges.reset();
+    this->limerinoBadges.reset();
+    this->badgeHQBadges.reset();
     this->twitch.reset();
     this->highlights.reset();
     this->notifications.reset();

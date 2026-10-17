@@ -217,6 +217,21 @@ public:
         return nullptr;
     }
 
+    JilChatBadges *getJilChatBadges() override
+    {
+        return nullptr;
+    }
+
+    LimerinoBadges *getLimerinoBadges() override
+    {
+        return nullptr;
+    }
+
+    BadgeHQBadges *getBadgeHQBadges() override
+    {
+        return nullptr;
+    }
+
     MoltorinoSupporterBadges *getMoltorinoSupporterBadges() override
     {
         return nullptr;

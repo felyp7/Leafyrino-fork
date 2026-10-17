@@ -205,6 +205,9 @@ WindowManager::WindowManager(const Args &appArgs_, const Paths &paths,
     this->updateWordTypeMaskListener.add(settings.showBadgesDankChat);
     this->updateWordTypeMaskListener.add(settings.showBadgesChatsen);
     this->updateWordTypeMaskListener.add(settings.showBadgesBluzyrino);
+    this->updateWordTypeMaskListener.add(settings.showBadgesJilChat);
+    this->updateWordTypeMaskListener.add(settings.showBadgesBadgeHQ);
+    this->updateWordTypeMaskListener.add(settings.showBadgesLimerino);
     this->updateWordTypeMaskListener.add(settings.enableEmoteImages);
     this->updateWordTypeMaskListener.add(settings.lowercaseDomains);
     this->updateWordTypeMaskListener.add(settings.showReplyButton);
@@ -220,6 +223,7 @@ WindowManager::WindowManager(const Args &appArgs_, const Paths &paths,
     this->forceLayoutChannelViewsListener.add(
         settings.removeSpacesBetweenEmotes);
     this->forceLayoutChannelViewsListener.add(settings.emoteScale);
+    this->forceLayoutChannelViewsListener.add(settings.twitchGifScale);
     this->forceLayoutChannelViewsListener.add(settings.enableEmoteModifiers);
     this->forceLayoutChannelViewsListener.add(settings.disabledEmoteModifiers);
     this->forceLayoutChannelViewsListener.add(settings.timestampFormat);
@@ -258,6 +262,7 @@ WindowManager::WindowManager(const Args &appArgs_, const Paths &paths,
     this->invalidateChannelViewBuffersListener.add(settings.webchatColor);
     this->invalidateChannelViewBuffersListener.add(settings.androidColor);
     this->invalidateChannelViewBuffersListener.add(settings.iosColor);
+    this->invalidateChannelViewBuffersListener.add(settings.mobileNewColor);
     this->invalidateChannelViewBuffersListener.add(
         settings.clientDetectionIcon);
 
@@ -357,6 +362,9 @@ void WindowManager::updateWordTypeMask()
     flags.set(settings->showBadgesDankChat ? MEF::BadgeDankChat : MEF::None);
     flags.set(settings->showBadgesChatsen ? MEF::BadgeChatsen : MEF::None);
     flags.set(settings->showBadgesBluzyrino ? MEF::BadgeBluzyrino : MEF::None);
+    flags.set(settings->showBadgesJilChat ? MEF::BadgeJilChat : MEF::None);
+    flags.set(settings->showBadgesBadgeHQ ? MEF::BadgeBadgeHQ : MEF::None);
+    flags.set(settings->showBadgesLimerino ? MEF::BadgeLimerino : MEF::None);
 
     // username
     flags.set(MEF::Username);

@@ -23,6 +23,7 @@
 #include "messages/MessageColor.hpp"
 #include "messages/MessageElement.hpp"
 #include "messages/MessageThread.hpp"
+#include "providers/badgehq/BadgeHQBadges.hpp"
 #include "providers/bluzyrino/BluzyrinoBadges.hpp"
 #include "providers/bttv/BttvBadges.hpp"
 #include "providers/bttv/BttvEmotes.hpp"
@@ -36,6 +37,8 @@
 #include "providers/ffzap/FfzApBadges.hpp"
 #include "providers/folhinha/FolhinhaBadges.hpp"
 #include "providers/homies/HomiesBadges.hpp"
+#include "providers/jilchat/JilChatBadges.hpp"
+#include "providers/limerino/LimerinoBadges.hpp"
 #include "providers/links/LinkResolver.hpp"
 #include "providers/moltorino/MoltorinoSupporterBadges.hpp"
 #include "providers/repetitions/RepeatedMessageDetector.hpp"
@@ -115,6 +118,12 @@ bool isUpperHexLetter(QChar c)
     return value >= 'A' && value <= 'F';
 }
 
+bool isLowerLetter(QChar c)
+{
+    const auto value = c.unicode();
+    return value >= 'a' && value <= 'z';
+}
+
 Message::ClientDetectionStatus performClientDetection(const QString &nonce)
 {
     using Status = Message::ClientDetectionStatus;
@@ -122,6 +131,16 @@ Message::ClientDetectionStatus performClientDetection(const QString &nonce)
     if (nonce.isEmpty())
     {
         return Status::Abnormal;
+    }
+
+    if (nonce.size() >= 8 && nonce.size() <= 12)
+    {
+        // matches /[a-z0-9]{8,12}/
+        const bool mobile =
+            std::all_of(nonce.cbegin(), nonce.cend(), [](QChar c) {
+                return isDigit(c) || isLowerLetter(c);
+            });
+        return mobile ? Status::MobileNew : Status::Abnormal;
     }
 
     if (nonce.size() == 32)
@@ -2171,6 +2190,9 @@ std::pair<MessagePtrMut, HighlightAlert> MessageBuilder::makeIrcMessage(
         builder.appendDankChatBadges(userID);
         builder.appendChatsenBadges(userID);
         builder.appendBluzyrinoBadges(userID);
+        builder.appendJilChatBadges(userID);
+        builder.appendBadgeHQBadges(userID);
+        builder.appendLimerinoBadges(userID);
         builder.appendHomiesBadges(userID);
         builder.appendFolhinhaBadges(userID);
 
@@ -3821,6 +3843,48 @@ void MessageBuilder::appendBluzyrinoBadges(const QString &userID)
     }
 }
 
+void MessageBuilder::appendJilChatBadges(const QString &userID)
+{
+    auto *provider = getApp()->getJilChatBadges();
+    if (provider == nullptr)
+    {
+        return;
+    }
+    for (const auto &badge : provider->getBadges({userID}))
+    {
+        this->emplace<BadgeElement>(badge, MessageElementFlag::BadgeJilChat);
+        this->message().externalBadges.emplace_back(badge->name.string);
+    }
+}
+
+void MessageBuilder::appendBadgeHQBadges(const QString &userID)
+{
+    auto *provider = getApp()->getBadgeHQBadges();
+    if (provider == nullptr)
+    {
+        return;
+    }
+    for (const auto &badge : provider->getBadges({userID}))
+    {
+        this->emplace<BadgeElement>(badge, MessageElementFlag::BadgeBadgeHQ);
+        this->message().externalBadges.emplace_back(badge->name.string);
+    }
+}
+
+void MessageBuilder::appendLimerinoBadges(const QString &userID)
+{
+    auto *provider = getApp()->getLimerinoBadges();
+    if (provider == nullptr)
+    {
+        return;
+    }
+    for (const auto &badge : provider->getBadges({userID}))
+    {
+        this->emplace<BadgeElement>(badge, MessageElementFlag::BadgeLimerino);
+        this->message().externalBadges.emplace_back(badge->name.string);
+    }
+}
+
 void MessageBuilder::appendMoltorinoBadges(const QString &userID)
 {
     if (!getSettings()->showBadgesMoltorino)
@@ -4112,6 +4176,9 @@ MessagePtr MessageBuilder::makeSelfBadgePreviewMessage(
     builder.appendDankChatBadges(userId);
     builder.appendChatsenBadges(userId);
     builder.appendBluzyrinoBadges(userId);
+    builder.appendJilChatBadges(userId);
+    builder.appendBadgeHQBadges(userId);
+    builder.appendLimerinoBadges(userId);
     builder.appendHomiesBadges(userId);
     builder.appendFolhinhaBadges(userId);
 
