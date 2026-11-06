@@ -761,7 +761,7 @@ function c2.MessageElementBase:add_flags(flags) end
 ---@field user_id string The ID of the sender
 ---@field channel_name string The name of the channel this message appeared in
 ---@field username_color string The color of the username
----@field server_received_time number The time the server received the message (in milliseconds since epoch)
+---@field timestamp number The message timestamp (in milliseconds since epoch)
 ---@field highlight_color string The color of the highlight or empty
 ---@field frozen boolean If this is set, Lua plugins can't modify this message (as it's visible to the user).
 c2.Message = {}
@@ -794,7 +794,7 @@ function c2.Message:clone() end
 ---@field user_id? string The ID of the user who sent the message
 ---@field channel_name? string The name of the channel this message appeared in
 ---@field username_color? string The color of the username
----@field server_received_time? number The time the server received the message (in milliseconds since epoch)
+---@field timestamp? number The message timestamp (in milliseconds since epoch)
 ---@field highlight_color? string|nil The color of the highlight (if any)
 ---@field elements? (MessageElementInit|MessageElement)[] The elements of the message
 
@@ -893,6 +893,7 @@ c2.MessageElementFlag = {
     Mention = 0,
     RepeatedMessageCounter = 0,
     LowercaseLinks = 0,
+    AutoModReviewExpanded = 0,
     RepliedMessage = 0,
     ReplyButton = 0,
     HeaderTimestamp = 0,
@@ -929,7 +930,6 @@ c2.MessageFlag = {
     AutoMod = 0,
     RecentMessage = 0,
     Whisper = 0,
-    HighlightedWhisper = 0,
     Debug = 0,
     Similar = 0,
     RedeemedHighlight = 0,

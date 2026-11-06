@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: MIT
 
+#include "common/Env.hpp"
 #include "common/Literals.hpp"
 #include "controllers/accounts/AccountController.hpp"
+#include "controllers/automod/AutoModReviewController.hpp"
 #include "controllers/highlights/HighlightController.hpp"
 #include "lib/Snapshot.hpp"
 #include "messages/Message.hpp"
@@ -28,7 +30,8 @@ namespace {
 ///
 /// When adding a test, start with `{ "input": {...} }` and set this to `true`
 /// to generate an initial snapshot. Make sure to verify the output!
-constexpr bool UPDATE_SNAPSHOTS = false;
+const bool UPDATE_SNAPSHOTS =
+    chatterino::env::readBool("CHATTERINO_UPDATE_TEST_SNAPSHOTS", false);
 
 const QString CATEGORY = u"EventSub"_s;
 
@@ -208,6 +211,7 @@ public:
     MockApplication()
         : highlights(this->settings, &this->accounts)
     {
+        this->autoModReview.initialize();
     }
 
     ILogging *getChatLogger() override
@@ -230,10 +234,16 @@ public:
         return &this->highlights;
     }
 
+    automod::AutoModReviewController *getAutoModReview() override
+    {
+        return &this->autoModReview;
+    }
+
     mock::EmptyLogging logging;
     mock::MockTwitchIrcServer twitch;
     AccountController accounts;
     HighlightController highlights;
+    automod::AutoModReviewController autoModReview;
 };
 
 std::shared_ptr<TwitchChannel> makeMockTwitchChannel(const QString &name)

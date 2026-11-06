@@ -446,6 +446,22 @@ public:
          FailureCallback<QString> failureCallback),
         (override));
 
+    MOCK_METHOD(void, getFollowedChannels,
+                (QString userID,
+                 (const ResultCallback<std::vector<HelixFollowedChannel>,
+                                       HelixPaginationState> &pageCallback),
+                 const FailureCallback<QString> &failureCallback,
+                 CancellationToken &&token),
+                (override));
+
+    MOCK_METHOD(void, getFollowedStreams,
+                (QString userID,
+                 (const ResultCallback<std::vector<HelixStream>,
+                                       HelixPaginationState> &pageCallback),
+                 const FailureCallback<QString> &failureCallback,
+                 CancellationToken &&token),
+                (override));
+
     // create poll
     MOCK_METHOD(void, createPoll,
                 (QString broadcasterID, QString title, QStringList choices,
@@ -492,15 +508,16 @@ public:
                  FailureCallback<QString> failureCallback),
                 (override));
 
-    MOCK_METHOD(
-        void, createEventSubSubscription,
-        (const eventsub::SubscriptionRequest &request, const QString &sessionID,
-         ResultCallback<HelixCreateEventSubSubscriptionResponse>
-             successCallback,
-         (FailureCallback<HelixCreateEventSubSubscriptionError, QString>
-              failureCallback),
-         (const QString &clientIdOverride, const QString &oauthTokenOverride)),
-        (override));
+    MOCK_METHOD(void, createEventSubSubscription,
+                (const eventsub::SubscriptionRequest &request,
+                 const QString &sessionID,
+                 ResultCallback<HelixCreateEventSubSubscriptionResponse>
+                     successCallback,
+                 (FailureCallback<HelixCreateEventSubSubscriptionError, QString>
+                      failureCallback),
+                 const QString &clientIdOverride,
+                 const QString &oauthTokenOverride),
+                (override));
 
     MOCK_METHOD(void, deleteEventSubSubscription,
                 (const QString &request, ResultCallback<> successCallback,
@@ -518,6 +535,11 @@ public:
                 (QString userID, ResultCallback<QSet<QString>> successCallback,
                  (FailureCallback<QString> failureCallback),
                  CancellationToken &&token),
+                (override));
+
+    MOCK_METHOD(void, validateToken,
+                (NetworkSuccessCallback successCallback,
+                 NetworkErrorCallback errorCallback),
                 (override));
 
     MOCK_METHOD(void, update, (QString clientId, QString oauthToken),

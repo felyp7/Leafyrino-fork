@@ -215,22 +215,19 @@ WindowManager::WindowManager(const Args &appArgs_, const Paths &paths,
     this->forceLayoutChannelViewsListener.add(
         settings.moderationActions.delayedItemsChanged);
     this->forceLayoutChannelViewsListener.add(
-        settings.highlightedMessages.delayedItemsChanged);
-    this->forceLayoutChannelViewsListener.add(
-        settings.highlightedUsers.delayedItemsChanged);
-    this->forceLayoutChannelViewsListener.add(
-        settings.highlightedBadges.delayedItemsChanged);
+        settings.sharedHighlights.delayedItemsChanged);
     this->forceLayoutChannelViewsListener.add(
         settings.removeSpacesBetweenEmotes);
     this->forceLayoutChannelViewsListener.add(settings.emoteScale);
     this->forceLayoutChannelViewsListener.add(settings.twitchGifScale);
     this->forceLayoutChannelViewsListener.add(settings.enableEmoteModifiers);
     this->forceLayoutChannelViewsListener.add(settings.disabledEmoteModifiers);
+    this->forceLayoutChannelViewsListener.add(
+        settings.hideMessageTimestampsWhenLive);
     this->forceLayoutChannelViewsListener.add(settings.timestampFormat);
     this->forceLayoutChannelViewsListener.add(
         settings.showTimestampDateTooltip);
     this->forceLayoutChannelViewsListener.add(settings.collpseMessagesMinLines);
-    this->forceLayoutChannelViewsListener.add(settings.enableRedeemedHighlight);
     this->forceLayoutChannelViewsListener.add(settings.enableGigantifyEmotes);
     this->forceLayoutChannelViewsListener.add(
         settings.showPinButtonOnModeratorsMode);
@@ -245,11 +242,16 @@ WindowManager::WindowManager(const Args &appArgs_, const Paths &paths,
     this->forceLayoutChannelViewsListener.add(settings.boldUsernames);
     this->forceLayoutChannelViewsListener.add(
         settings.showBlockedTermAutomodMessages);
+    this->forceLayoutChannelViewsListener.add(
+        settings.automodMatchHighlightColor);
+    this->forceLayoutChannelViewsListener.add(
+        settings.automodMatchHighlightStyle);
     this->forceLayoutChannelViewsListener.add(settings.hideModerated);
     this->forceLayoutChannelViewsListener.add(
         settings.streamerModeHideModActions);
     this->forceLayoutChannelViewsListener.add(
         settings.streamerModeHideRestrictedUsers);
+    this->forceLayoutChannelViewsListener.add(this->themes.updated);
     this->forceLayoutChannelViewsListener.add(fonts.fontChanged);
 
     this->layoutChannelViewsListener.add(settings.timestampFormat);

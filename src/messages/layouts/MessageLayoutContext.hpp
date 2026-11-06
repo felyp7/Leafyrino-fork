@@ -52,14 +52,6 @@ struct MessagePreferences {
     QColor lastMessageColor;
     Qt::BrushStyle lastMessagePattern{};
 
-    bool enableRedeemedHighlight{};
-    bool enableFirstMessageHighlight{};
-    bool enableSubHighlight{};
-    bool enableFollowHighlight{};
-    bool enableWatchStreakHighlight{};
-    bool enableAutomodHighlight{};
-    bool enableAnnouncementHighlight{};
-    bool enableColoredAnnouncementHighlight{};
     bool enableClientDetectionHighlight{};
 
     bool alternateMessages{};
@@ -116,6 +108,12 @@ struct MessageLayoutContext {
 
     Channel *selectedChannel = nullptr;
     const Message &message;
+
+    /// The message is the selected review in the /automod queue, so its
+    /// expanded-only elements are shown
+    bool autoModReviewExpanded = false;
+    /// The message is laid out in the /automod queue
+    bool autoModReviewChannel = false;
 };
 
 }  // namespace chatterino

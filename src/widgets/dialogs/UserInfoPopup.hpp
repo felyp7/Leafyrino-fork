@@ -71,6 +71,7 @@ public:
     void setData(const QString &name, const ChannelPtr &channel);
     void setData(const QString &name, const ChannelPtr &contextChannel,
                  const ChannelPtr &openingChannel);
+    Split *getSplit() const;
 
     void setYouTubeContext();
 
@@ -236,6 +237,7 @@ private:
         followingStatusChangedConnection_;
 
     std::unique_ptr<pajlada::Signals::ScopedConnection> refreshConnection_;
+    std::unique_ptr<pajlada::Signals::ScopedConnection> replaceConnection_;
     std::unique_ptr<pajlada::Signals::ScopedConnection>
         twitchUserStateConnection_;
     std::unique_ptr<pajlada::Signals::ScopedConnection>
@@ -292,12 +294,14 @@ private:
         ChannelView *latestMessages = nullptr;
         LabelButton *loadMoreMessages = nullptr;
 
+        LabelButton *whisperLabel = nullptr;
         LabelButton *usercardLabel = nullptr;
         LabelButton *userlogsLabel = nullptr;
         LabelButton *badgesLabel = nullptr;
         LabelButton *sevenTVUserLabel = nullptr;
         QLabel *seventvPaintPixmapLabel = nullptr;
         QWidget *seventvPaintRow = nullptr;
+        LabelButton *seventvPaintHideButton = nullptr;
         LabelButton *rolesLabel = nullptr;
         LabelButton *switchAvatars = nullptr;
 

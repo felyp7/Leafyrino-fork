@@ -13,7 +13,7 @@
 #include "util/Backup.hpp"
 #include "util/Expected.hpp"
 #include "util/MultiChannel.hpp"
-#include "util/QMagicEnum.hpp"
+#include "util/QMagicEnumTagged.hpp"
 #include "widgets/Window.hpp"
 
 #include <QFile>
@@ -124,6 +124,8 @@ SplitDescriptor SplitDescriptor::loadFromJSON(const QJsonObject &root)
     descriptor.server_ = data.value("server").toInt(-1);
     descriptor.anonymous_ = data.value("anonymous").toBool(false);
     descriptor.moderationMode_ = root.value("moderationMode").toBool();
+    descriptor.autoModChannelFilter_ =
+        data.value("autoModChannel").toString().trimmed().toLower();
     if (data.contains("channel"))
     {
         descriptor.channelName_ = data.value("channel").toString();
@@ -189,6 +191,10 @@ QJsonObject SplitDescriptor::toJson() const
     {
         data.insert("anonymous"_L1, true);
     }
+    if (!this->autoModChannelFilter_.isEmpty())
+    {
+        data.insert("autoModChannel"_L1, this->autoModChannelFilter_);
+    }
     if (this->type_ == u"kick")
     {
         data.insert("roomID", static_cast<qint64>(this->kickRoomID));
@@ -249,7 +255,8 @@ IndirectChannel SplitDescriptor::decodeChannel() const
         return getApp()->getTwitch()->getOrAddChannel(this->channelName_);
     };
 
-    auto type = qmagicenum::enumCast<Channel::Type>(this->type_);
+    auto type =
+        qmagicenum::SerializedName::enumCast<Channel::Type>(this->type_);
     if (!type)
     {
         return twitchChannel();

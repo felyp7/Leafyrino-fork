@@ -160,6 +160,11 @@ void setLinkOn(MessageElement *el, const Link &link)
         case Link::None:
         case Link::AutoModAllow:
         case Link::AutoModDeny:
+        case Link::AutoModReviewApprove:
+        case Link::AutoModReviewDeny:
+        case Link::AutoModReviewTimeout:
+        case Link::AutoModReviewBan:
+        case Link::AutoModReviewRetry:
         case Link::AcknowledgeChatWarning:
         case Link::JumpToOrCreateChannel:
         case Link::OpenAccountsPage:
@@ -742,14 +747,14 @@ void createUserType(sol::table &c2)
                 checkWritable(msg);
                 msg->usernameColor = QColor::fromString(sv);
             }),
-        "server_received_time",
+        "timestamp",
         sol::property(
             [](Message *msg) {
-                return msg->serverReceivedTime.toMSecsSinceEpoch();
+                return msg->timestamp.toMSecsSinceEpoch();
             },
             [](Message *msg, qint64 ms) {
                 checkWritable(msg);
-                msg->serverReceivedTime = datetimeFromOffset(ms);
+                msg->timestamp = datetimeFromOffset(ms);
             }),
         "highlight_color",
         sol::property(
@@ -837,11 +842,10 @@ std::shared_ptr<Message> messageFromTable(const sol::table &tbl)
         msg->usernameColor = QColor(usernameColor);
     }
 
-    auto serverReceivedTime =
-        tbl.get<std::optional<qint64>>("server_received_time");
-    if (serverReceivedTime)
+    auto timestamp = tbl.get<std::optional<qint64>>("timestamp");
+    if (timestamp)
     {
-        msg->serverReceivedTime = datetimeFromOffset(*serverReceivedTime);
+        msg->timestamp = datetimeFromOffset(*timestamp);
     }
 
     // missing: badges

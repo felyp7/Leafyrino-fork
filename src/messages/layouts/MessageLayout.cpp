@@ -5,13 +5,13 @@
 #include "messages/layouts/MessageLayout.hpp"
 
 #include "Application.hpp"
+#include "controllers/highlights/types/AutomodCaughtHighlight.hpp"
 #include "messages/layouts/MessageLayoutContainer.hpp"
 #include "messages/layouts/MessageLayoutContext.hpp"
 #include "messages/layouts/MessageLayoutElement.hpp"
 #include "messages/Message.hpp"
 #include "messages/MessageElement.hpp"
 #include "messages/Selection.hpp"
-#include "providers/colors/ColorProvider.hpp"
 #include "singletons/Resources.hpp"
 #include "singletons/Settings.hpp"
 #include "singletons/StreamerMode.hpp"
@@ -152,6 +152,23 @@ bool MessageLayout::layout(const MessageLayoutContext &ctx,
     layoutRequired |= this->currentWordFlags_ != ctx.flags;
     this->currentWordFlags_ = ctx.flags;
 
+    if (this->flags.has(MessageLayoutFlag::AutoModReviewSelected) !=
+        ctx.autoModReviewExpanded)
+    {
+        this->flags.set(MessageLayoutFlag::AutoModReviewSelected,
+                        ctx.autoModReviewExpanded);
+        this->flags.set(MessageLayoutFlag::RequiresBufferUpdate);
+        layoutRequired = true;
+    }
+    if (this->flags.has(MessageLayoutFlag::AutoModReviewChannel) !=
+        ctx.autoModReviewChannel)
+    {
+        this->flags.set(MessageLayoutFlag::AutoModReviewChannel,
+                        ctx.autoModReviewChannel);
+        this->flags.set(MessageLayoutFlag::RequiresBufferUpdate);
+        layoutRequired = true;
+    }
+
     layoutRequired |= this->flags.has(MessageLayoutFlag::RequiresLayout);
     this->flags.unset(MessageLayoutFlag::RequiresLayout);
 
@@ -219,6 +236,12 @@ void MessageLayout::actuallyLayout(const MessageLayoutContext &ctx)
 
     for (const auto &element : this->message_->elements)
     {
+        if (!ctx.autoModReviewExpanded &&
+            element->getFlags().has(MessageElementFlag::AutoModReviewExpanded))
+        {
+            continue;
+        }
+
         if (hideModerated && this->message_->flags.has(MessageFlag::Disabled))
         {
             continue;
@@ -328,22 +351,7 @@ MessagePaintResult MessageLayout::paint(const MessagePaintContext &ctx)
             ctx.messageColors.disabled);
     }
 
-    if (!ctx.isMentions &&
-        ((this->message_->flags.has(MessageFlag::RedeemedChannelPointReward) &&
-          !this->message_->usesTwitchGigantifyPresentation()) ||
-         this->message_->flags.has(MessageFlag::RedeemedHighlight)) &&
-        ctx.preferences.enableRedeemedHighlight)
-    {
-        ctx.painter.fillRect(
-            QRect{
-                0,
-                ctx.y,
-                static_cast<int>(this->scale_ * 4),
-                pixmap->height(),
-            },
-            *ColorProvider::instance().color(ColorType::RedeemedHighlight));
-    }
-
+    // draw selection
     if (!ctx.selection.isEmpty())
     {
         this->container_.paintSelection(ctx.painter, ctx.messageIndex,
@@ -437,84 +445,34 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
         return ctx.messageColors.regularBg;
     }();
 
-    if (this->message_->flags.has(MessageFlag::FirstMessage) &&
-        ctx.preferences.enableFirstMessageHighlight)
+    const bool isAutoModReview = this->message_->autoModReview != nullptr;
+    const bool isSelectedAutoModReview =
+        isAutoModReview &&
+        this->flags.has(MessageLayoutFlag::AutoModReviewSelected);
+
+    if (this->message_->flags.has(MessageFlag::Highlighted) &&
+        !this->flags.has(MessageLayoutFlag::IgnoreHighlights))
     {
-        backgroundColor = blendColors(
-            backgroundColor,
-            *ctx.colorProvider.color(ColorType::FirstMessageHighlight));
-    }
-    else if (this->message_->flags.has(MessageFlag::WatchStreak) &&
-             ctx.preferences.enableWatchStreakHighlight)
-    {
-        backgroundColor = blendColors(
-            backgroundColor, *ctx.colorProvider.color(ColorType::WatchStreak));
-    }
-    else if ((this->message_->flags.has(MessageFlag::Highlighted) ||
-              this->message_->flags.has(MessageFlag::HighlightedWhisper)) &&
-             !this->flags.has(MessageLayoutFlag::IgnoreHighlights))
-    {
-        assert(this->message_->highlightColor);
-        if (this->message_->highlightColor)
+        // NOTE: As we move more things into Highlighted, and less things to use custom flags for their color,
+        // they will start respecting the IgnoreHighlights flag. Keep this in mind.
+        // assert(this->message_->highlightColor);
+        if (this->message_->highlightColor &&
+            this->message_->highlightColor->isValid())
         {
-            backgroundColor =
-                blendColors(backgroundColor, *this->message_->highlightColor);
+            auto highlight = *this->message_->highlightColor;
+            // every message in the /automod queue is a review, keep the tint
+            // light there so the selection stands out
+            if (isAutoModReview &&
+                this->flags.has(MessageLayoutFlag::AutoModReviewChannel))
+            {
+                highlight.setAlpha(std::min(highlight.alpha(), 40));
+            }
+            backgroundColor = blendColors(backgroundColor, highlight);
         }
     }
-    else if (this->message_->flags.has(MessageFlag::Announcement) &&
-             ctx.preferences.enableAnnouncementHighlight)
+    else if (this->message_->flags.has(MessageFlag::ChatWarning))
     {
-        backgroundColor = blendColors(
-            backgroundColor,
-            *ctx.colorProvider.color(colorTypeFromHelixAnnouncementColor(
-                this->message_->announcementColor,
-                ctx.preferences.enableColoredAnnouncementHighlight)));
-    }
-    else if (this->message_->flags.has(MessageFlag::Subscription) &&
-             ctx.preferences.enableSubHighlight)
-    {
-        backgroundColor = blendColors(
-            backgroundColor, *ctx.colorProvider.color(ColorType::Subscription));
-    }
-    else if (this->message_->flags.has(MessageFlag::Follow) &&
-             ctx.preferences.enableFollowHighlight)
-    {
-        backgroundColor = blendColors(
-            backgroundColor, *ctx.colorProvider.color(ColorType::Follow));
-    }
-    else if ((this->message_->flags.has(MessageFlag::RedeemedHighlight) ||
-              (this->message_->flags.has(
-                   MessageFlag::RedeemedChannelPointReward) &&
-               !this->message_->usesTwitchGigantifyPresentation())) &&
-             ctx.preferences.enableRedeemedHighlight)
-    {
-        backgroundColor =
-            blendColors(backgroundColor,
-                        *ctx.colorProvider.color(ColorType::RedeemedHighlight));
-    }
-    else if (this->message_->flags.has(MessageFlag::ChatWarning) &&
-             ctx.preferences.enableAutomodHighlight)
-    {
-        backgroundColor =
-            blendColors(backgroundColor,
-                        *ctx.colorProvider.color(ColorType::AutomodHighlight));
-    }
-    else if (this->message_->flags.has(MessageFlag::AutoMod) ||
-             this->message_->flags.has(MessageFlag::LowTrustUsers))
-    {
-        if (ctx.preferences.enableAutomodHighlight &&
-            (this->message_->flags.has(MessageFlag::AutoModOffendingMessage) ||
-             this->message_->flags.has(
-                 MessageFlag::AutoModOffendingMessageHeader)))
-        {
-            backgroundColor = blendColors(
-                backgroundColor,
-                *ctx.colorProvider.color(ColorType::AutomodHighlight));
-        }
-        else
-        {
-            backgroundColor = QColor("#404040");
-        }
+        backgroundColor = blendColors(backgroundColor, QColor(64, 64, 64, 127));
     }
     else if (this->message_->flags.has(MessageFlag::Debug))
     {
@@ -524,12 +482,6 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
                  this->message_->clientDetection, ctx.preferences))
     {
         backgroundColor = blendColors(backgroundColor, *clientColor);
-    }
-    else if (this->message_->flags.has(MessageFlag::UncategorizedNotification))
-    {
-        // TODO: Give this a better/its own color :-)
-        backgroundColor = blendColors(
-            backgroundColor, *ctx.colorProvider.color(ColorType::Subscription));
     }
 
     if (ctx.tintByPlatform)
@@ -570,7 +522,40 @@ void MessageLayout::updateBuffer(QPixmap *buffer,
         }
     }
 
+    if (isSelectedAutoModReview)
+    {
+        auto selection = ctx.messageColors.selection;
+        selection.setAlpha(26);
+        backgroundColor = blendColors(backgroundColor, selection);
+    }
+
     painter.fillRect(buffer->rect(), backgroundColor);
+
+    // accent bar so held messages are easy to spot in chat
+    if (isAutoModReview)
+    {
+        QColor accent;
+        if (isSelectedAutoModReview)
+        {
+            accent = ctx.messageColors.linkText;
+        }
+        else if (this->message_->highlightColor &&
+                 this->message_->highlightColor->isValid())
+        {
+            accent = *this->message_->highlightColor;
+        }
+        else
+        {
+            accent = autoModMatchColor();
+        }
+        accent.setAlpha(isSelectedAutoModReview ? 205 : 160);
+        painter.fillRect(
+            QRectF(0, 0,
+                   std::max(1.0, (isSelectedAutoModReview ? 2.0 : 1.5) *
+                                     static_cast<qreal>(this->scale_)),
+                   buffer->height() / buffer->devicePixelRatioF()),
+            accent);
+    }
 
     if (getSettings()->clientDetectionIcon && clientDetectionIcon.has_value())
     {

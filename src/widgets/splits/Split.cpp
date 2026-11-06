@@ -27,12 +27,14 @@
 #include "util/CustomPlayer.hpp"
 #include "util/IncognitoBrowser.hpp"
 #include "util/MultiChannel.hpp"
+#include "util/QMagicEnumTagged.hpp"
 #include "util/StreamLink.hpp"
 #include "widgets/ChatterListWidget.hpp"
 #include "widgets/dialogs/RewardQueueDialog.hpp"
 #include "widgets/dialogs/SelectChannelDialog.hpp"
 #include "widgets/dialogs/SelectChannelFiltersDialog.hpp"
 #include "widgets/dialogs/UserInfoPopup.hpp"
+#include "widgets/helper/AutoModReviewBar.hpp"
 #include "widgets/helper/ChannelView.hpp"
 #include "widgets/helper/DebugPopup.hpp"
 #include "widgets/helper/MessageView.hpp"
@@ -511,6 +513,11 @@ void Split::addShortcuts()
              this->openModViewInBrowser();
              return "";
          }},
+        {"openUnbanRequests",
+         [this](const std::vector<QString> &) -> QString {
+             this->openUnbanRequestsInBrowser();
+             return "";
+         }},
         {"openRewardQueue",
          [this](const std::vector<QString> &) -> QString {
              this->openRewardQueue();
@@ -819,6 +826,61 @@ void Split::addShortcuts()
              mc->setActiveChannelIndex(nextIndex);
              getApp()->getWindows()->forceLayoutChannelViews();
              return {};
+         }},
+        {"automodReviewApprove",
+         [this](const auto &) -> QString {
+             return this->view_->approveSelectedAutoMod()
+                        ? QString{}
+                        : "Select an actionable message in /automod first.";
+         }},
+        {"automodReviewDeny",
+         [this](const auto &) -> QString {
+             return this->view_->denySelectedAutoMod()
+                        ? QString{}
+                        : "Select an actionable message in /automod first.";
+         }},
+        {"automodReviewRetry",
+         [this](const auto &) -> QString {
+             return this->view_->retrySelectedAutoMod()
+                        ? QString{}
+                        : "The selected AutoMod item has no failed action.";
+         }},
+        {"automodReviewOpenUsercard",
+         [this](const auto &) -> QString {
+             return this->view_->openSelectedAutoModUsercard()
+                        ? QString{}
+                        : "Select a message in /automod first.";
+         }},
+        {"automodReviewCopy",
+         [this](const auto &) -> QString {
+             return this->view_->copySelectedAutoModDetails()
+                        ? QString{}
+                        : "Select a message in /automod first.";
+         }},
+        {"automodReviewTimeout",
+         [this](const auto &) -> QString {
+             return this->view_->timeoutSelectedAutoMod()
+                        ? QString{}
+                        : "Select an actionable message in /automod first.";
+         }},
+        {"automodReviewBan",
+         [this](const auto &) -> QString {
+             return this->view_->banSelectedAutoMod()
+                        ? QString{}
+                        : "Select an actionable message in /automod first.";
+         }},
+        {"automodReviewSelect",
+         [this](const std::vector<QString> &arguments) -> QString {
+             if (arguments.empty())
+             {
+                 return "AutoMod Review selection requires a direction.";
+             }
+             const auto &argument = arguments.front();
+             const bool actionable = argument.endsWith("-actionable");
+             const int direction = argument.startsWith("previous") ? -1 : 1;
+             return this->view_->selectAutoModReview(direction, actionable)
+                        ? QString{}
+                        : "No matching AutoMod review item is visible.";
          }},
     };
 
@@ -1953,7 +2015,26 @@ void Split::setChannel(IndirectChannel newChannel)
 
     this->channel_ = newChannel;
 
+    const bool isAutoMod =
+        newChannel.get()->getType() == Channel::Type::TwitchAutomod;
+    if (!isAutoMod && this->autoModReviewBar_ != nullptr)
+    {
+        this->autoModReviewBar_->setActive(false);
+    }
+
     this->view_->setChannel(newChannel.get());
+
+    if (isAutoMod)
+    {
+        if (this->autoModReviewBar_ == nullptr)
+        {
+            this->autoModReviewBar_ = new AutoModReviewBar(this, this->view_);
+            this->header_->setAutoModReviewBar(this->autoModReviewBar_);
+            this->autoModReviewBar_->setSelectedChannel(
+                this->autoModChannelFilter_);
+        }
+        this->autoModReviewBar_->setActive(true);
+    }
     this->channelSignalHolder_.clear();
     this->twitchBannerSignalHolder_.clear();
     this->bannerToggleOverride_ = -1;
@@ -2007,7 +2088,7 @@ void Split::setChannel(IndirectChannel newChannel)
 
     this->indirectChannelChangedConnection_ =
         newChannel.getChannelChanged().connect([this] {
-            QTimer::singleShot(0, [this] {
+            QTimer::singleShot(0, this, [this] {
                 this->setChannel(this->channel_);
             });
         });
@@ -2097,6 +2178,23 @@ void Split::setModerationMode(bool value)
 bool Split::getModerationMode() const
 {
     return this->moderationMode_;
+}
+
+void Split::setAutoModChannelFilter(QString channel)
+{
+    this->autoModChannelFilter_ = std::move(channel);
+    if (this->autoModReviewBar_ != nullptr)
+    {
+        this->autoModReviewBar_->setSelectedChannel(
+            this->autoModChannelFilter_);
+    }
+}
+
+QString Split::getAutoModChannelFilter() const
+{
+    return this->autoModReviewBar_ != nullptr
+               ? this->autoModReviewBar_->selectedChannel()
+               : this->autoModChannelFilter_;
 }
 
 std::optional<bool> Split::checkSpellingOverride() const
@@ -2507,6 +2605,17 @@ void Split::openModViewInBrowser()
     }
 }
 
+void Split::openUnbanRequestsInBrowser()
+{
+    auto channel = this->getSelectedChannel();
+
+    if (auto *twitchChannel = dynamic_cast<TwitchChannel *>(channel.get()))
+    {
+        QDesktopServices::openUrl("https://www.twitch.tv/popout/moderator/" +
+                                  twitchChannel->getName() + "/unban-requests");
+    }
+}
+
 void Split::openRewardQueue()
 {
     auto channel = this->getSelectedChannel();
@@ -2756,10 +2865,15 @@ SplitDescriptor Split::buildDescriptor() const
     SplitDescriptor descriptor;
     descriptor.moderationMode_ = this->getModerationMode();
     descriptor.filters_ = this->getFilters();
+    if (this->getIndirectChannel().getType() == Channel::Type::TwitchAutomod)
+    {
+        descriptor.autoModChannelFilter_ = this->getAutoModChannelFilter();
+    }
     descriptor.spellCheckOverride = this->checkSpellingOverride();
 
     auto chan = this->getIndirectChannel();
-    descriptor.type_ = qmagicenum::enumNameString(chan.getType());
+    descriptor.type_ =
+        qmagicenum::SerializedName::enumNameString(chan.getType());
     switch (chan.getType())
     {
         case Channel::Type::Twitch:

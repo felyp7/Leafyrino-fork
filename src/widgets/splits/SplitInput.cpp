@@ -2158,12 +2158,23 @@ bool SplitInput::eventFilter(QObject *obj, QEvent *event)
         }
     }
 
+    // the /automod shortcuts are single keys, they only apply while there's
+    // nothing typed
+    if (isTextEditObject && event->type() == QEvent::ShortcutOverride &&
+        this->ui_.textEdit->document()->isEmpty() &&
+        this->channelView_->handleAutoModReviewKey(
+            static_cast<QKeyEvent *>(event)))
+    {
+        event->accept();
+        return true;
+    }
+
     if (event->type() == QEvent::ShortcutOverride ||
         event->type() == QEvent::Shortcut)
     {
         if (auto *popup = this->inputCompletionPopup_.data())
         {
-            if (popup->isVisible())
+            if (popup->isVisible() && popup->hasCompletions())
             {
                 // Stop shortcut from triggering by saying we will handle it ourselves
                 event->accept();
@@ -2320,6 +2331,13 @@ void SplitInput::installTextEditEvents()
                 }
             }
 
+            if (this->ui_.textEdit->document()->isEmpty() &&
+                this->channelView_->handleAutoModReviewKey(event))
+            {
+                event->accept();
+                return;
+            }
+
 #if MOLTORINO_ENABLE_CHANNEL_POINT_REWARDS
             if (this->channelPointRewardPromptSubmit_ &&
                 event->key() == Qt::Key_Escape)
@@ -2426,16 +2444,26 @@ void SplitInput::installTextEditEvents()
                 cursor.setPosition(static_cast<int>(word.end() - text.begin()),
                                    QTextCursor::KeepAnchor);
 
+                auto *firstAction = menu->actions().value(0);
                 auto suggestions =
                     getApp()->getSpellChecker()->suggestions(word.toString());
                 for (const auto &sugg :
                      suggestions | std::views::take(nSuggestions))
                 {
                     auto qSugg = QString::fromStdString(sugg);
-                    menu->addAction(qSugg, [this, qSugg, cursor]() mutable {
-                        cursor.insertText(qSugg);
-                        this->ui_.textEdit->setTextCursor(cursor);
-                    });
+                    auto *action = new QAction(qSugg, menu);
+                    QObject::connect(
+                        action, &QAction::triggered, this,
+                        [this, qSugg, cursor]() mutable {
+                            cursor.insertText(qSugg);
+                            this->ui_.textEdit->setTextCursor(cursor);
+                        });
+                    menu->insertAction(firstAction, action);
+                }
+
+                if (!suggestions.empty())
+                {
+                    menu->insertSeparator(firstAction);
                 }
             }
 #else
@@ -2969,11 +2997,26 @@ void SplitInput::updateCompletionPopup()
     auto &edit = *this->ui_.textEdit;
     const auto text = edit.toPlainText();
     const auto cursorPosition = edit.textCursor().position();
+    // Potat channel records are only fetched once the user types in a channel.
+    if (!text.isEmpty() && channel != nullptr &&
+        channel->getType() == Channel::Type::Twitch)
+    {
+        if (auto *potat = getApp()->getPotatCommands())
+        {
+            potat->ensureChannel(channel->getName());
+        }
+    }
     this->updateCommandArgumentHint(text, cursorPosition);
     if (!showEmoteCompletion && !showUsernameCompletion &&
         !showCommandCompletion)
     {
         this->resetCommandCompletionSession();
+        this->hideCompletionPopup();
+        return;
+    }
+
+    if (edit.isCompletionInProgress())
+    {
         this->hideCompletionPopup();
         return;
     }
@@ -3033,10 +3076,6 @@ void SplitInput::updateCompletionPopup()
                 selectedChannel != nullptr &&
                 selectedChannel->getType() == Channel::Type::Twitch;
             auto *potat = potatChannel ? getApp()->getPotatCommands() : nullptr;
-            if (potat != nullptr)
-            {
-                potat->ensureChannel(selectedChannel->getName());
-            }
             const auto isBot =
                 queryPreview.startsWith('$') ||
                 (potatChannel &&
@@ -3317,9 +3356,17 @@ void SplitInput::showCompletionPopup(const QString &text, CompletionKind kind)
             [that = QPointer(this)](const QString &text) mutable {
                 if (auto *this2 = that.data())
                 {
+                    auto completions =
+                        this2->inputCompletionPopup_->selectedCompletions(
+                            this2->ui_.textEdit->isFirstWord());
                     this2->insertCompletionText(text);
                     this2->hideCompletionPopup();
                     this2->resetCommandCompletionSession();
+                    if (completions)
+                    {
+                        auto [items, index] = *completions;
+                        this2->ui_.textEdit->continueCompletion(items, index);
+                    }
                 }
             });
     }
@@ -3691,6 +3738,40 @@ QString SplitInput::getInputText() const
 void SplitInput::insertText(const QString &text)
 {
     this->ui_.textEdit->insertPlainText(text);
+}
+
+void SplitInput::setWhisperTarget(const QString &username) const
+{
+    auto cursor = this->ui_.textEdit->textCursor();
+    cursor.beginEditBlock();
+    cursor.movePosition(QTextCursor::Start);
+    const auto input = this->getInputText();
+    if (TWITCH_WHISPER_COMMANDS.contains(input.section(' ', 0, 0)))
+    {
+        auto prefixEnd = input.indexOf(' ');
+        if (prefixEnd < 0)
+        {
+            prefixEnd = input.size();
+        }
+        while (prefixEnd < input.size() && input[prefixEnd] == ' ')
+        {
+            ++prefixEnd;
+        }
+        while (prefixEnd < input.size() && input[prefixEnd] != ' ')
+        {
+            ++prefixEnd;
+        }
+        if (prefixEnd < input.size())
+        {
+            ++prefixEnd;
+        }
+        cursor.setPosition(static_cast<int>(prefixEnd),
+                           QTextCursor::KeepAnchor);
+    }
+    cursor.insertText("/w " + username + " ");
+    cursor.endEditBlock();
+    cursor.movePosition(QTextCursor::End);
+    this->ui_.textEdit->setTextCursor(cursor);
 }
 
 void SplitInput::hide()
@@ -4666,13 +4747,6 @@ void SplitInput::updateChannel()
         this->commandHintChannel_.reset();
         this->resolvedCommandHint_.reset();
         this->resolvedSupibotDescription_.clear();
-        if (selected->getType() == Channel::Type::Twitch)
-        {
-            if (auto *potat = getApp()->getPotatCommands())
-            {
-                potat->ensureChannel(selected->getName());
-            }
-        }
         this->updateCommandArgumentHint(
             this->ui_.textEdit->toPlainText(),
             this->ui_.textEdit->textCursor().position());

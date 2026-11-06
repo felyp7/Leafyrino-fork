@@ -10,6 +10,7 @@
 #include <QStandardItemModel>
 #include <QTimer>
 
+#include <cstddef>
 #include <vector>
 
 namespace chatterino {
@@ -27,6 +28,7 @@ class SignalVector
 public:
     pajlada::Signals::Signal<SignalVectorItemEvent<T>> itemInserted;
     pajlada::Signals::Signal<SignalVectorItemEvent<T>> itemRemoved;
+    pajlada::Signals::NoArgSignal itemsCleared;
     pajlada::Signals::NoArgSignal delayedItemsChanged;
 
     SignalVector()
@@ -56,11 +58,22 @@ public:
         return bool(this->itemCompare_);
     }
 
+    /// A read-only version of the vector which can be used concurrently.
     std::shared_ptr<const std::vector<T>> readOnly()
     {
         return this->readOnly_;
     }
 
+    /// This may only be called from the GUI thread.
+    ///
+    ///	@param item
+    /// 	Item to be inserted.
+    /// @param proposedIndex
+    /// 	Index to insert at. `-1` will append at the end.
+    ///		Will be ignored if the vector is sorted.
+    /// @param caller
+    ///     Caller id which will be passed in the itemInserted and itemRemoved
+    /// 	signals.
     int insert(const T &item, int index = -1, void *caller = nullptr)
     {
         assertInGuiThread();
@@ -87,13 +100,35 @@ public:
             this->items_.insert(this->items_.begin() + index, item);
         }
 
+        this->updateReadOnly();
         SignalVectorItemEvent<T> args{item, index, caller};
         this->itemInserted.invoke(args);
-        this->itemsChanged_();
+        this->scheduleItemsChanged();
 
         return index;
     }
 
+    /// Clear all the items in this vector.
+    ///
+    /// Don't call this if your model implements custom rows / rely on `afterRemoved` being called when rows are removed.
+    /// This may only be called from the GUI thread.
+    void clear()
+    {
+        assertInGuiThread();
+
+        this->items_.clear();
+        this->updateReadOnly();
+        this->itemsCleared.invoke();
+        this->scheduleItemsChanged();
+    }
+
+    /// This may only be called from the GUI thread.
+    ///
+    ///	@param item
+    /// 	Item to be appended.
+    /// @param caller
+    ///     Caller id which will be passed in the itemInserted and itemRemoved
+    /// 	signals.
     int append(const T &item, void *caller = nullptr)
     {
         assertInGuiThread();
@@ -108,10 +143,11 @@ public:
         T item = this->items_[index];
         this->items_.erase(this->items_.begin() + index);
 
+        this->updateReadOnly();
         SignalVectorItemEvent<T> args{item, index, caller};
         this->itemRemoved.invoke(args);
 
-        this->itemsChanged_();
+        this->scheduleItemsChanged();
     }
 
     bool removeFirstMatching(auto &&matcher, void *caller = nullptr)
@@ -124,15 +160,29 @@ public:
             if (matcher(item))
             {
                 this->items_.erase(this->items_.begin() + index);
+                this->updateReadOnly();
                 SignalVectorItemEvent<T> args{item, static_cast<int>(index),
                                               caller};
                 this->itemRemoved.invoke(args);
-                this->itemsChanged_();
+                this->scheduleItemsChanged();
                 return true;
             }
         }
 
         return false;
+    }
+
+    /// Run the given function on each item in the vector
+    ///
+    /// This may only be called from the GUI thread.
+    void forEach(auto &&fn)
+    {
+        assertInGuiThread();
+
+        for (auto &item : this->items_)
+        {
+            fn(item);
+        }
     }
 
     const std::vector<T> &raw() const
@@ -147,6 +197,7 @@ public:
         return *this->readOnly();
     }
 
+    // mirror vector functions
     auto begin() const
     {
         assertInGuiThread();
@@ -172,14 +223,17 @@ public:
     }
 
 private:
-    void itemsChanged_()
+    void updateReadOnly()
+    {
+        this->readOnly_ = std::make_shared<const std::vector<T>>(this->items_);
+    }
+
+    void scheduleItemsChanged()
     {
         if (!this->itemsChangedTimer_.isActive())
         {
             this->itemsChangedTimer_.start();
         }
-
-        this->readOnly_ = std::make_shared<const std::vector<T>>(this->items_);
     }
 
     std::vector<T> items_;

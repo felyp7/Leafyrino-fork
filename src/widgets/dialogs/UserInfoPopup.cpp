@@ -65,6 +65,7 @@
 #include "widgets/Notebook.hpp"
 #include "widgets/Scrollbar.hpp"
 #include "widgets/splits/Split.hpp"
+#include "widgets/splits/SplitInput.hpp"
 #include "widgets/Window.hpp"
 
 #include <IrcMessage>
@@ -388,7 +389,8 @@ void createUsercardStatusRow(LayoutCreator<QVBoxLayout> &vbox, QWidget **rowOut,
 }
 
 void createUsercardPaintRow(LayoutCreator<QVBoxLayout> &vbox, QWidget **rowOut,
-                            QLabel **pixmapOut, Button **paintNameButtonOut)
+                            QLabel **pixmapOut, Button **paintNameButtonOut,
+                            LabelButton **hideButtonOut)
 {
     auto *row = new QWidget;
     auto *layout = new QHBoxLayout(row);
@@ -401,6 +403,10 @@ void createUsercardPaintRow(LayoutCreator<QVBoxLayout> &vbox, QWidget **rowOut,
 
     auto *paintNameButton = new ClickablePaintName;
     layout->addWidget(paintNameButton, 0, Qt::AlignVCenter);
+
+    auto *hideButton = new LabelButton("Hide", nullptr, QSize{6, 0});
+    layout->addSpacing(4);
+    layout->addWidget(hideButton, 0, Qt::AlignVCenter);
     layout->addStretch(1);
 
     row->setVisible(false);
@@ -409,6 +415,7 @@ void createUsercardPaintRow(LayoutCreator<QVBoxLayout> &vbox, QWidget **rowOut,
     *rowOut = row;
     *pixmapOut = paintNameButton->pixmapLabel();
     *paintNameButtonOut = paintNameButton;
+    *hideButtonOut = hideButton;
 }
 
 void createUsercardColorRow(LayoutCreator<QVBoxLayout> &vbox, QWidget **rowOut,
@@ -812,7 +819,7 @@ MessagePtr makeUsercardModLogMessage(const GqlUsercardMessage &message,
     builder->messageText = body;
     builder->searchText = displayName + QStringLiteral(": ") + body;
     builder->channelName = channelName;
-    builder->serverReceivedTime = sentAt;
+    builder->timestamp = sentAt;
     builder->usernameColor = color;
     builder->flags.set(MessageFlag::DoNotLog,
                        MessageFlag::DoNotTriggerNotification);
@@ -843,14 +850,14 @@ QDateTime oldestUsercardMessageTime(const ChannelPtr &channel)
 
     for (const auto &message : channel->getMessageSnapshot())
     {
-        if (message == nullptr || !message->serverReceivedTime.isValid())
+        if (message == nullptr || !message->timestamp.isValid())
         {
             continue;
         }
 
-        if (!oldest.isValid() || message->serverReceivedTime < oldest)
+        if (!oldest.isValid() || message->timestamp < oldest)
         {
-            oldest = message->serverReceivedTime;
+            oldest = message->timestamp;
         }
     }
 
@@ -1513,7 +1520,28 @@ UserInfoPopup::UserInfoPopup(bool closeAutomatically, Split *split)
             Button *seventvPaintNameButton = nullptr;
             createUsercardPaintRow(vbox, &this->ui_.seventvPaintRow,
                                    &this->ui_.seventvPaintPixmapLabel,
-                                   &seventvPaintNameButton);
+                                   &seventvPaintNameButton,
+                                   &this->ui_.seventvPaintHideButton);
+            QObject::connect(
+                this->ui_.seventvPaintHideButton, &Button::leftClicked, this,
+                [this] {
+                    if (!this->seventvPaint_ ||
+                        this->seventvPaint_->id.isEmpty())
+                    {
+                        return;
+                    }
+
+                    auto *paints = getApp()->getSeventvPaints();
+                    if (paints->isPaintHidden(this->seventvPaint_->id))
+                    {
+                        paints->unhidePaint(this->seventvPaint_->id);
+                    }
+                    else
+                    {
+                        paints->hidePaint(this->seventvPaint_->id,
+                                          this->seventvPaint_->name);
+                    }
+                });
             if (seventvPaintNameButton)
             {
                 QObject::connect(
@@ -1596,6 +1624,8 @@ UserInfoPopup::UserInfoPopup(bool closeAutomatically, Split *split)
         // visibility of this is updated in setData
 
         user.emplace<LabelButton>("&Notes", this).assign(&this->ui_.notesAdd);
+        auto whisper = user.emplace<LabelButton>("&Whisper", this)
+                           .assign(&this->ui_.whisperLabel);
         auto usercard = user.emplace<LabelButton>("&Usercard", this)
                             .assign(&this->ui_.usercardLabel);
         auto userlogs = user.emplace<LabelButton>("&Logs", this)
@@ -1624,6 +1654,22 @@ UserInfoPopup::UserInfoPopup(bool closeAutomatically, Split *split)
         unvip->setScaleIndependentSize(30, 30);
 
         user->addStretch(1);
+
+        auto openWhisper = [this] {
+            if (this->userName_.isEmpty() || this->split_ == nullptr ||
+                this->isYouTube_ || this->isKick_)
+            {
+                return;
+            }
+
+            this->split_->getInput().setWhisperTarget(this->userName_);
+            this->split_->window()->activateWindow();
+            this->split_->setFocus(Qt::MouseFocusReason);
+        };
+        QObject::connect(whisper.getElement(), &Button::leftClicked, this,
+                         openWhisper);
+        this->registerMnemonicButton(this->ui_.whisperLabel, Qt::Key_W,
+                                     openWhisper);
 
         auto openUsercard = [this] {
             MessagePlatform platform =
@@ -2141,6 +2187,10 @@ void UserInfoPopup::installEvents()
             this->refreshSeventvPaint();
         },
         this->signalHolder_);
+    this->signalHolder_.managedConnect(
+        getSettings()->hiddenSevenTVPaints.delayedItemsChanged, [this] {
+            this->refreshSeventvPaint();
+        });
     getSettings()->showSevenTVUsercardButton.connect(
         [this](bool enabled) {
             if (enabled && this->seventvUserID_.isEmpty() &&
@@ -2504,6 +2554,7 @@ void UserInfoPopup::setData(const QString &name,
     {
         this->ui_.usercardLabel->setText("Open channel on &YouTube");
         this->ui_.usercardLabel->setVisible(!this->youtubeChannelId_.isEmpty());
+        this->ui_.whisperLabel->hide();
         this->ui_.userlogsLabel->hide();
     }
     else if (type == Channel::Type::TwitchLive ||
@@ -2513,11 +2564,13 @@ void UserInfoPopup::setData(const QString &name,
         // not a normal twitch channel, the url opened by the button will be invalid, so hide the button
         this->ui_.usercardLabel->hide();
         this->ui_.userlogsLabel->hide();
+        this->ui_.whisperLabel->setVisible(!this->isKick_);
     }
     else
     {
         this->ui_.usercardLabel->setText("&Usercard");
         this->ui_.usercardLabel->show();
+        this->ui_.whisperLabel->show();
         this->ui_.userlogsLabel->show();
     }
 
@@ -2738,6 +2791,11 @@ void UserInfoPopup::updateYouTubeLatestMessages()
     }
 }
 
+Split *UserInfoPopup::getSplit() const
+{
+    return this->split_;
+}
+
 void UserInfoPopup::updateLatestMessages()
 {
     this->usercardMessagesChannel_ =
@@ -2775,6 +2833,19 @@ void UserInfoPopup::updateLatestMessages()
                         // and display the latest messages
                         this->updateLatestMessages();
                     }
+                }));
+
+    this->replaceConnection_ =
+        std::make_unique<pajlada::Signals::ScopedConnection>(
+            this->underlyingChannel_->messageReplaced.connect(
+                [this](auto, const auto &message, const auto &replacement) {
+                    if (!checkMessageUserName(this->userName_, replacement))
+                    {
+                        return;
+                    }
+
+                    this->ui_.latestMessages->channel()->replaceMessage(
+                        message, replacement);
                 }));
 }
 
@@ -5273,8 +5344,9 @@ void UserInfoPopup::refreshSeventvPaint()
         return;
     }
 
+    // Include hidden paints so they can be unhidden from here.
     const auto paint = getApp()->getSeventvPaints()->getPaint(
-        this->userName_.toLower(), this->isKick_);
+        this->userName_.toLower(), this->isKick_, true);
     this->seventvPaint_ = paint;
 
     if (!paint)
@@ -5282,6 +5354,12 @@ void UserInfoPopup::refreshSeventvPaint()
         this->ui_.seventvPaintRow->hide();
         return;
     }
+
+    const bool hidden = getApp()->getSeventvPaints()->isPaintHidden(paint->id);
+    this->ui_.seventvPaintHideButton->setText(hidden ? "Unhide" : "Hide");
+    this->ui_.seventvPaintHideButton->setToolTip(
+        hidden ? "Render this paint in chat again"
+               : "Stop rendering this paint in chat");
 
     this->ui_.seventvPaintRow->show();
     this->updateSeventvPaintPixmap();
@@ -5319,11 +5397,26 @@ void UserInfoPopup::updateSeventvPaintPixmap()
         }
     }
 
-    const auto pixmap = paint->getPixmap(paintName, font, userColor, size,
-                                         this->scale(), dpr, true);
+    auto pixmap = paint->getPixmap(paintName, font, userColor, size,
+                                   this->scale(), dpr, true);
+
+    const bool hidden = getApp()->getSeventvPaints()->isPaintHidden(paint->id);
+    if (hidden)
+    {
+        // Dim hidden paints so their state is visible at a glance.
+        QPixmap dimmed(pixmap.size());
+        dimmed.setDevicePixelRatio(pixmap.devicePixelRatio());
+        dimmed.fill(Qt::transparent);
+        QPainter painter(&dimmed);
+        painter.setOpacity(0.4);
+        painter.drawPixmap(0, 0, pixmap);
+        painter.end();
+        pixmap = std::move(dimmed);
+    }
 
     this->ui_.seventvPaintPixmapLabel->setPixmap(pixmap);
-    this->ui_.seventvPaintPixmapLabel->setToolTip(paintName);
+    this->ui_.seventvPaintPixmapLabel->setToolTip(
+        hidden ? paintName + " (hidden)" : paintName);
 }
 
 UserInfoPopup::~UserInfoPopup()
